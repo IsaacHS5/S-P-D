@@ -64,7 +64,7 @@ contract Rulers is ERC721Enumerable, AccessControl {
     function flipIsMintingActive() external {
         require(
             hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
-            "Must have admin role"
+            "Error, Must have admin role"
         );
         isMintingActive = !isMintingActive;
     }
@@ -72,7 +72,7 @@ contract Rulers is ERC721Enumerable, AccessControl {
     function setURIs(uint256 _state, string memory _uri) external {
         require(
             hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
-            "Must have admin role"
+            "Error, Must have admin role"
         );
         tokenURIs[_state] = _uri;
     }
@@ -80,7 +80,7 @@ contract Rulers is ERC721Enumerable, AccessControl {
     function setStatePsychopathHashs(uint256 _index, bytes32 _sP) external {
         require(
             hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
-            "Must have admin role"
+            "Error, Must have admin role"
         );
         statePsychopath[_index] = _sP;
     }
@@ -161,14 +161,23 @@ contract Rulers is ERC721Enumerable, AccessControl {
         
     }
 
-    // What if I add the access contract and create a role to increase Ruler SP?
     function increaseSp(uint256 _tokenId) external {
         require(
             hasRole(SPD_ROLE, _msgSender()),
-            "Must have spd role"
+            "Error, Must have spd role"
         );
+        
+        bool isFound = false;
+        while(isFound == false) {
+            uint256 _index = 0;
+            if(tokenIdToRuler[_tokenId].sP == statePsychopath[_index]) {
+                _index++;
+                tokenIdToRuler[_tokenId].sP = statePsychopath[_index];
 
-        tokenIdToRuler[_tokenId].sP = statePsychopath[4];
+            } else {
+                _index++;
+            }
+        }
     }
 
     function killRuler(uint256 _tokenId) external payable {
@@ -192,7 +201,7 @@ contract Rulers is ERC721Enumerable, AccessControl {
     function withdraw() external {
         require(
             hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
-            "Must have admin role"
+            "Error, Must have admin role"
         );
         (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
         require(success);
