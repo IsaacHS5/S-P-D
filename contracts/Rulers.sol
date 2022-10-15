@@ -5,7 +5,6 @@ pragma solidity  ^0.8.17;
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 import "hardhat/console.sol";
 
 interface IApproval {
@@ -90,6 +89,7 @@ contract Rulers is ERC721Enumerable, AccessControl {
         require(isMintingActive == true, "Error, minting is not active");
         require(msg.value >= mintPrice, "Error, not enought ETH");
         require(balanceOf(msg.sender) == 0, "Error, you can only mint 1 token");
+        require(IDetectives(detectivesTokenAddr).balanceOf(msg.sender) >= 1, "Error, you're a detective");
 
         uint256 _index = 0;
 
@@ -117,7 +117,7 @@ contract Rulers is ERC721Enumerable, AccessControl {
     }
 
     function tokenURI(uint256 _tokenId) public view virtual override returns(string memory _tokenURI) {
-        require(_exists(_tokenId), "Error, token must exist");
+        require(_exists(_tokenId), "ERC721Metadata: URI query for nonexistent token");
 
         if(tokenIdToRuler[_tokenId].isRevealed == true) {
             string memory currentURI = tokenURIs[1];
@@ -138,7 +138,7 @@ contract Rulers is ERC721Enumerable, AccessControl {
     }
 
     function ifMatchRevealIdentity(uint256 _tokenId, address _suspiciusAddr) external payable {
-        require(_exists(_tokenId), "Error, token must exist");
+        require(_exists(_tokenId), "Error, token doesn't exist");
         require(IApproval(approvalTokenAddr).balanceOf(msg.sender) >= 1, "Error, you don't hace approval");
         require(IDetectives(detectivesTokenAddr).balanceOf(msg.sender) >= 1, "Error, you're not a detective");
 
@@ -151,7 +151,7 @@ contract Rulers is ERC721Enumerable, AccessControl {
     }
 
     function investigateSpHashOfToken(uint256 _tokenId) external payable returns(bytes32 _statePsychopath) {
-        require(_exists(_tokenId), "Error, token must exist");
+        require(_exists(_tokenId), "Error, token doesn't exist");
         require(IApproval(approvalTokenAddr).balanceOf(msg.sender) >= 1, "Error, you don't hace approval");
         require(IDetectives(detectivesTokenAddr).balanceOf(msg.sender) >= 1, "Error, you're not a detective");
         
@@ -181,7 +181,7 @@ contract Rulers is ERC721Enumerable, AccessControl {
     }
 
     function killRuler(uint256 _tokenId) external payable {
-        require(_exists(_tokenId), "Error, token must exist");
+        require(_exists(_tokenId), "Error, token doesn't exist");
         require(IApproval(approvalTokenAddr).balanceOf(msg.sender) >= 1, "Error, you don't hace approval");
         require(IDetectives(detectivesTokenAddr).balanceOf(msg.sender) >= 1, "Error, you're not a detective");
 
@@ -192,19 +192,17 @@ contract Rulers is ERC721Enumerable, AccessControl {
     }
 
     function burnByOwner(uint256 _tokenId) external {
-        require(_exists(_tokenId), "ERC721Metadata: URI query for nonexistent token");
+        require(_exists(_tokenId), "Error, the doesn't must");
         require(ownerOf(_tokenId) == msg.sender, "Error, you're not the owner of this token");
 
         _burn(_tokenId);
     }
 
     function withdraw() external {
-        require(
-            hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
-            "Error, Must have admin role"
-        );
-        (bool success, ) = payable(msg.sender).call{value: address(this).balance}("");
-        require(success);
+        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Error, only admin can withdraw");
+        require(address(this).balance > 0, "Error, the contract is empty");
+
+        payable(msg.sender).transfer(address(this).balance);
     }
    
         
