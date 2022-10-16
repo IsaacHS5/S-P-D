@@ -26,6 +26,7 @@ contract Approval is ERC20, AccessControl {
     address[] public requesters;
     address private detectivesTokenAddr;
     address private rulersTokenAddr;
+    mapping(address => uint256) public requesterToFeedOffer;
 
     constructor(
         string memory _name,

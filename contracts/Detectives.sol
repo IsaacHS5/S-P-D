@@ -21,7 +21,7 @@ contract Detectives is ERC721Enumerable, AccessControl {
     4-Lieutenant
     5-Captain
     6-Commander
-     */
+    */
 
     using Counters for Counters.Counter;
     Counters.Counter private _tokenIds;
@@ -30,7 +30,7 @@ contract Detectives is ERC721Enumerable, AccessControl {
 
     struct Detective {
         uint256 actualRank;
-        bytes32 sP;
+        uint256 sP;
     }
 
     bytes32 public constant SPD_ROLE = keccak256("SPD_ROLE");
@@ -41,7 +41,7 @@ contract Detectives is ERC721Enumerable, AccessControl {
     string public baseExtension = ".json";
     string private baseURI;
     address private rulersTokenAddr;
-    bytes32[] private statePsychopath;
+    uint256[] public detectiveStatePsychopath = [80, 99, 100, 120, 160, 199, 200];
     mapping(uint256 => Detective) public tokenIdToDetective;
 
     constructor(
@@ -62,19 +62,12 @@ contract Detectives is ERC721Enumerable, AccessControl {
         return super.supportsInterface(interfaceId);
     }
 
-    function flipIsMintingActive() external {
-        require(
-            hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
-            "Error, Must have admin role"
-        );
+    function flipIsMintingActive() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        
         isMintingActive = !isMintingActive;
     }
 
-    function updateBaseURI(string memory _baseURI) external {
-        require(
-            hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
-            "Error, Must have admin role"
-        );
+    function updateBaseURI(string memory _baseURI) external onlyRole(DEFAULT_ADMIN_ROLE) {
 
         baseURI = _baseURI;
     }
@@ -86,20 +79,28 @@ contract Detectives is ERC721Enumerable, AccessControl {
            string(abi.encodePacked(baseURI, _tokenId.toString(), baseExtension)) : "";
     }
 
+    function getDetectiveRank(uint256 _tokenId) external view returns (uint256) {
+        require(_exists(_tokenId), "ERC721Metadata: URI query for nonexistent token");
+
+        return tokenIdToDetective[_tokenId].actualRank;
+    }
+
     function mint() external payable {
         require(maxSupply > totalSupply(), "Error, sold out!");
         require(isMintingActive == true, "Error, minting is not active");
         require(msg.value >= mintPrice, "Error, not enought ETH");
         require(balanceOf(msg.sender) == 0, "Error, you can only mint 1 token");
-        require(IRulers(rulersTokenAddr).balanceOf(msg.sender) >= 1, "Error, you're a ruler");
+        require(IRulers(rulersTokenAddr).balanceOf(msg.sender) == 0, "Error, you're a ruler");
 
         uint256 _index = 0;
 
         uint256 newTokenId = _tokenIds.current();
-        tokenIdToDetective[newTokenId].sP = statePsychopath[_index];
+        tokenIdToDetective[newTokenId].sP = detectiveStatePsychopath[_index];
         tokenIdToDetective[newTokenId].actualRank = 1;
         _safeMint(msg.sender, newTokenId);
         _tokenIds.increment();
+        console.log("NFT w/ ID %s has been minted to %s", newTokenId, msg.sender);
+
 
     }
 
@@ -116,14 +117,15 @@ contract Detectives is ERC721Enumerable, AccessControl {
 
     function increaseDetectiveSP(uint256 _tokenId) external {
         require(_exists(_tokenId), "Error, token doesn't exist");
+        require(tokenIdToDetective[_tokenId].sP != detectiveStatePsychopath[6], "Error, token SP at his limit!");
 
         if(hasRole(SPD_ROLE, _msgSender()) || IRulers(rulersTokenAddr).balanceOf(msg.sender) >= 1) {
             bool isFound = false;
             while(isFound == false) {
                 uint256 _index = 0;
-                if(tokenIdToDetective[_tokenId].sP == statePsychopath[_index]) {
+                if(tokenIdToDetective[_tokenId].sP == detectiveStatePsychopath[_index]) {
                     _index++;
-                    tokenIdToDetective[_tokenId].sP = statePsychopath[_index];
+                    tokenIdToDetective[_tokenId].sP = detectiveStatePsychopath[_index];
     
                 } else {
                     _index++;
@@ -133,42 +135,33 @@ contract Detectives is ERC721Enumerable, AccessControl {
         
     }
 
-    function levelUpRank(uint256 _tokenId) external {
+    function levelUpRank(uint256 _tokenId) external onlyRole(SPD_ROLE) {
         require(_exists(_tokenId), "Error, token doesn't exist");
-        require(
-            hasRole(SPD_ROLE, _msgSender()),
-            "Error, Must have spd role"
-        );
 
         if(tokenIdToDetective[_tokenId].actualRank < 6) {
             tokenIdToDetective[_tokenId].actualRank++;
         }
     }
 
-    function levelDownRank(uint256 _tokenId) external {
+    function levelDownRank(uint256 _tokenId) external onlyRole(SPD_ROLE) {
         require(_exists(_tokenId), "Error, token doesn't exist");
-        require(
-            hasRole(SPD_ROLE, _msgSender()),
-            "Error, Must have spd role"
-        );
 
         if(tokenIdToDetective[_tokenId].actualRank > 1) {
             tokenIdToDetective[_tokenId].actualRank--;
         }
     }
 
-    function withdraw() external {
-        require(hasRole(DEFAULT_ADMIN_ROLE, _msgSender()), "Error, only admin can withdraw");
+    function withdraw() external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(address(this).balance > 0, "Error, the contract is empty");
 
         payable(msg.sender).transfer(address(this).balance);
     }
 
-    function killRuler(uint256 _tokenId) external payable {
+    function killDetective(uint256 _tokenId) external payable {
         require(_exists(_tokenId), "Error, token doesn't exist");
         require(IRulers(rulersTokenAddr).balanceOf(msg.sender) >= 1 , "Error, you are not a ruler");
 
-        if(tokenIdToDetective[_tokenId].sP == statePsychopath[4]) {
+        if(tokenIdToDetective[_tokenId].sP == detectiveStatePsychopath[4]) {
             _burn(_tokenId);
         }
         
