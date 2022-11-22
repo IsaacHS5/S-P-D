@@ -3,13 +3,10 @@
 pragma solidity  ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "hardhat/console.sol";
-
-interface IRulers {
-    function balanceOf(address _addr) external view returns (uint256);
-}
 
 contract Detectives is ERC721Enumerable, AccessControl {
 
@@ -40,7 +37,6 @@ contract Detectives is ERC721Enumerable, AccessControl {
     bool public isMintingActive = false;
     string public baseExtension = ".json";
     string private baseURI;
-    address private rulersTokenAddr;
     uint256[] public detectiveStatePsychopath = [80, 99, 100, 120, 160, 199, 200];
     mapping(uint256 => Detective) public tokenIdToDetective;
 
@@ -49,13 +45,11 @@ contract Detectives is ERC721Enumerable, AccessControl {
         string memory _contractSymbol,
         uint256 _setMaxSupply,
         uint256 _setMintPrice,
-        address _spdAddr,
-        address _rulersTokenAddr
+        address _spdAddr
     )
     ERC721(_contractName, _contractSymbol) {
         maxSupply = _setMaxSupply;
         mintPrice = _setMintPrice;
-        rulersTokenAddr = _rulersTokenAddr;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(SPD_ROLE, _spdAddr);
     }
@@ -87,12 +81,12 @@ contract Detectives is ERC721Enumerable, AccessControl {
         return tokenIdToDetective[_tokenId].actualRank;
     }
 
-    function mint() external payable {
+    function mint(address _rulersTokenAddr) external payable {
         require(maxSupply > totalSupply(), "Error, sold out!");
         require(isMintingActive == true, "Error, minting is not active");
         require(msg.value >= mintPrice, "Error, not enought ETH");
         require(balanceOf(msg.sender) == 0, "Error, you can only mint 1 token");
-        require(IRulers(rulersTokenAddr).balanceOf(msg.sender) == 0, "Error, you're a ruler");
+        require(IERC721(_rulersTokenAddr).balanceOf(msg.sender) == 0, "Error, you're a ruler");
 
         uint256 _index = 0;
 
@@ -117,11 +111,11 @@ contract Detectives is ERC721Enumerable, AccessControl {
         return tokenIds;
     }
 
-    function increaseDetectiveSP(uint256 _tokenId) external {
+    function increaseDetectiveSP(address _rulersTokenAddr, uint256 _tokenId) external {
         require(_exists(_tokenId), "Error, token doesn't exist");
         require(tokenIdToDetective[_tokenId].sP != detectiveStatePsychopath[6], "Error, token SP at his limit!");
 
-        if(hasRole(SPD_ROLE, _msgSender()) || IRulers(rulersTokenAddr).balanceOf(msg.sender) >= 1) {
+        if(hasRole(SPD_ROLE, _msgSender()) || IERC721(_rulersTokenAddr).balanceOf(msg.sender) >= 1) {
             bool isFound = false;
             while(isFound == false) {
                 uint256 _index = 0;
@@ -153,9 +147,9 @@ contract Detectives is ERC721Enumerable, AccessControl {
         }
     }
 
-    function killDetective(uint256 _tokenId) external payable {
+    function killDetective(address _rulersTokenAddr, uint256 _tokenId) external payable {
         require(_exists(_tokenId), "Error, token doesn't exist");
-        require(IRulers(rulersTokenAddr).balanceOf(msg.sender) >= 1 , "Error, you are not a ruler");
+        require(IERC721(_rulersTokenAddr).balanceOf(msg.sender) >= 1 , "Error, you are not a ruler");
 
         if(tokenIdToDetective[_tokenId].sP == detectiveStatePsychopath[4]) {
             _burn(_tokenId);
