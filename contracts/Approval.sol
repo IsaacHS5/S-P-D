@@ -26,7 +26,8 @@ contract Approval is ERC20, AccessControl {
     address[] public requesters;
     address private detectivesTokenAddr;
     address private rulersTokenAddr;
-    mapping(address => uint256) public requesterToFeedOffer;
+    mapping(address => uint256) public detectiveTorequestAmount;
+    mapping(address => uint256) private detectiveToFeed;
 
     constructor(
         string memory _name,
@@ -48,16 +49,31 @@ contract Approval is ERC20, AccessControl {
         maxSupply = _newMaxSupply;
     }
 
-    function requetApproval() external {
+    function requetApproval() external payable {
         require(balanceOf(msg.sender) > 0, "Error, you can't request more approval");
         require(requesters.length < maxRequests, "Error, requests are at their limit");
         require(IDetectives(detectivesTokenAddr).balanceOf(msg.sender) >= 1, "Error, you are not a detective");
+         
+        uint256 feed;
+        if(detectiveTorequestAmount[msg.sender] >= 7) {
+            feed = 001e18;
+            require(msg.value >= feed, "Error, need to pay your feeds");
+            detectiveTorequestAmount[msg.sender] = 0;
 
+        } else {
+            feed = 00001e18;
+            require(msg.value >= feed, "Error, need to pay your feeds");
+            detectiveTorequestAmount[msg.sender]++;
+        }
+
+        detectiveToFeed[msg.sender] = msg.value;
         requesters.push(msg.sender);
     }
 
     function deleteRequester(address _requester) external {
         require(IRulers(rulersTokenAddr).balanceOf(msg.sender) >= 1, "Error, you are not a ruler");
+        require(balanceOf(_requester) > 1, "Error, requester hasn't receive approval yet");
+        
         
         bool isFound = false;
         while(isFound == false) {
@@ -72,7 +88,7 @@ contract Approval is ERC20, AccessControl {
 
     }
 
-    function sendToRequester(address _to, uint256 _tokenId) external {
+    function sendToRequester(address _requester, uint256 _tokenId) external {
         uint256 bigNumber = 1e18;
         uint256 total;
 
@@ -97,6 +113,8 @@ contract Approval is ERC20, AccessControl {
         } else {
             _mint(_to, bigNumber);
         }
+
+        payable(msg.sender).transferFrom(address(this), _requester, detectiveToFeed[_to]);
 
     }
 

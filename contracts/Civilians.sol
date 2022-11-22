@@ -2,14 +2,11 @@
 
 pragma solidity  ^0.8.17;
 
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "hardhat/console.sol";
-
-interface IRulers {
-    function balanceOf(address _addr) external view returns (uint256);
-}
 
 contract Civilians is ERC721Enumerable, AccessControl {
 
@@ -19,7 +16,6 @@ contract Civilians is ERC721Enumerable, AccessControl {
     using Strings for uint256;
 
     struct Civilian {
-        string name;
         uint256 id;
         uint256 sP;
         bool dead;
@@ -30,19 +26,16 @@ contract Civilians is ERC721Enumerable, AccessControl {
     bool public isMintingActive = false;
     string public baseExtension = ".json";
     string private baseURI;
-    address private rulersTokenAddr;
     uint256[] public civilianStatePsychopath = [80, 99, 100, 120, 160, 199, 200];
     mapping(uint256 => Civilian) public tokenIdToCivilian;
 
     constructor(
         string memory _contractName,
         string memory _contractSymbol,
-        uint256 _setMaxSupply,
-        address _rulersTokenAddr
+        uint256 _setMaxSupply
     )
     ERC721(_contractName, _contractSymbol) {
         maxSupply = _setMaxSupply;
-        rulersTokenAddr = _rulersTokenAddr;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
@@ -67,18 +60,15 @@ contract Civilians is ERC721Enumerable, AccessControl {
            string(abi.encodePacked(baseURI, _tokenId.toString(), baseExtension)) : "";
     }
 
-    function mint() external {
-        require(maxSupply > totalSupply(), "Error, sold out!");
-        require(isMintingActive == true, "Error, minting is not active");
-        require(balanceOf(msg.sender) == 0, "Error, you can't mint more tokens");
-        require(IRulers(rulersTokenAddr).balanceOf(msg.sender) >= 1, "Error, you're not a ruler");
-        
-        uint256 _amount = 5;
+    function mint(uint256 _amount, address _to) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(maxSupply > totalSupply(), "Error, supply is empty!");
 
         for(uint256 _nfts; _nfts < _amount; _nfts++) {
             uint256 newTokenId = _tokenIds.current();
+            tokenIdToCivilian[newTokenId].id = newTokenId;
+            tokenIdToCivilian[newTokenId].dead = false;
             tokenIdToCivilian[newTokenId].sP = civilianStatePsychopath[0];
-            _safeMint(msg.sender, newTokenId);
+            _safeMint(_to, newTokenId);
             _tokenIds.increment();
             console.log("NFT w/ ID %s has been minted to %s", newTokenId, msg.sender);
 
@@ -86,11 +76,11 @@ contract Civilians is ERC721Enumerable, AccessControl {
 
     }
 
-    function increaseCivilianSP(uint256 _tokenId) external {
+    function increaseCivilianSP(address _rulersTokenAddr, uint256 _tokenId) external {
         require(_exists(_tokenId), "Error, token doesn't exist");
         require(tokenIdToCivilian[_tokenId].sP != civilianStatePsychopath[6], "Error, token SP at his limit!");
 
-        if(IRulers(rulersTokenAddr).balanceOf(msg.sender) >= 1) {
+        if(IERC721(_rulersTokenAddr).balanceOf(msg.sender) >= 1) {
             bool isFound = false;
             while(isFound == false) {
                 uint256 _index = 0;
@@ -102,6 +92,15 @@ contract Civilians is ERC721Enumerable, AccessControl {
                     _index++;
                 }
            }
+        }
+        
+    }
+
+    function killCivilian(address _rulersTokenAddr, uint256 _tokenId) external {
+        require(_exists(_tokenId), "Error, token doesn't exist");
+
+        if(IERC721(_rulersTokenAddr).balanceOf(msg.sender) >= 1) {
+            _burn(_tokenId);
         }
         
     }

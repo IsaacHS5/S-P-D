@@ -3,14 +3,10 @@
 pragma solidity  ^0.8.17;
 
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "hardhat/console.sol";
-
-interface IApproval {
-    function balanceOf(address _addr) external view returns (uint256);
-    function transfer(address _to, uint256 _amount) external payable;
-}
 
 interface IDetectives {
     function balanceOf(address _addr) external view returns (uint256);
@@ -39,11 +35,10 @@ contract Rulers is ERC721Enumerable, AccessControl {
     uint256 public mintPrice;
     bool public isMintingActive = false;
     string public baseExtension = ".json";
-    address private approvalTokenAddr;
     address private detectivesTokenAddr;
     bytes32 rulerStatePsychopath;
     mapping(uint256 => string) private tokenURIs;
-    mapping(uint256 => Ruler) private tokenIdToRuler;
+    mapping(uint256 => Ruler) internal tokenIdToRuler;
 
     constructor(
         string memory _contractName,
@@ -52,15 +47,13 @@ contract Rulers is ERC721Enumerable, AccessControl {
         uint256 _setMintPrice,
         bytes32 _setRulerStatePsychopath,
         address _spdAddr,
-        address _setDetectiveTokenAddr,
-        address _setApprovalTokenAddr
+        address _setDetectiveTokenAddr
     ) 
     ERC721(_contractName, _contractSymbol) {
         maxSupply = _setMaxSupply;
         mintPrice = _setMintPrice;
         rulerStatePsychopath = _setRulerStatePsychopath;
         detectivesTokenAddr = _setDetectiveTokenAddr;
-        approvalTokenAddr = _setApprovalTokenAddr;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(SPD_ROLE, _spdAddr);
     }
@@ -74,6 +67,10 @@ contract Rulers is ERC721Enumerable, AccessControl {
         isMintingActive = !isMintingActive;
     }
 
+    function updateRulersSP(bytes32 _sP) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        rulerStatePsychopath = _sP;
+    }
+
     function setURIs(uint256 _state, string memory _uri) external onlyRole(DEFAULT_ADMIN_ROLE) {
        
         tokenURIs[_state] = _uri;
@@ -84,20 +81,12 @@ contract Rulers is ERC721Enumerable, AccessControl {
         require(isMintingActive == true, "Error, minting is not active");
         require(msg.value >= mintPrice, "Error, not enought ETH");
         require(balanceOf(msg.sender) == 0, "Error, you can only mint 1 token");
-        require(IDetectives(detectivesTokenAddr).balanceOf(msg.sender) >= 1, "Error, you're a detective");
-
-        uint256 _index = 0;
+        require(IDetectives(detectivesTokenAddr).balanceOf(msg.sender) == 0, "Error, you're a detective");
 
         uint256 newTokenId = _tokenIds.current();
-        tokenIdToRuler[newTokenId].sP = rulerStatePsychopath[_index];
         _safeMint(msg.sender, newTokenId);
         _tokenIds.increment();
         console.log("NFT w/ ID %s has been minted to %s", newTokenId, msg.sender);
-        _index++;
-
-        if(_index == 5) {
-            _index = 0;
-        }
 
     } 
 
@@ -133,13 +122,12 @@ contract Rulers is ERC721Enumerable, AccessControl {
         }
     }
 
-    function ifMatchRevealIdentity(uint256 _tokenId, address _suspiciusAddr) external payable {
+    function ifMatchRevealIdentity(address _approvalTokenAddr, uint256 _tokenId, address _suspiciusAddr) external payable returns (bool) {
         require(_exists(_tokenId), "Error, token doesn't exist");
-        require(IApproval(approvalTokenAddr).balanceOf(msg.sender) >= 1, "Error, you don't hace approval");
+        require(IERC20(_approvalTokenAddr).balanceOf(msg.sender) >= 1, "Error, you don't have approval");
         require(IDetectives(detectivesTokenAddr).balanceOf(msg.sender) >= 1, "Error, you're not a detective");
         
-        address tokenOwnerAddr = ownerOf(_tokenId);
-        IApproval(approvalTokenAddr).transfer(tokenOwnerAddr, 1);
+        IERC20(_approvalTokenAddr).transfer(_suspiciusAddr, 1);
         uint256 _senderTokenId = IDetectives(detectivesTokenAddr).tokenOfOwnerByIndex(msg.sender, 0);
 
         if(ownerOf(_tokenId) == _suspiciusAddr) {
@@ -147,17 +135,20 @@ contract Rulers is ERC721Enumerable, AccessControl {
             tokenIdToRuler[_tokenId].isSPRevealed = true;
             IDetectives(detectivesTokenAddr).levelUpRank(_senderTokenId);
 
+            return true;
 
         } else {
             IDetectives(detectivesTokenAddr).increaseDetectiveSP(_tokenId);
             IDetectives(detectivesTokenAddr).levelDownRank(_senderTokenId);
 
+            return false;
+
         }
     }
 
-    function investigateSpfToken(uint256 _tokenId) external payable returns(bytes32 _statePsychopath) {
+    function investigateSpfToken(address _approvalTokenAddr, uint256 _tokenId) external payable returns(bytes32 _statePsychopath) {
         require(_exists(_tokenId), "Error, token doesn't exist");
-        require(IApproval(approvalTokenAddr).balanceOf(msg.sender) >= 1, "Error, you don't hace approval");
+        require(IERC20(_approvalTokenAddr).balanceOf(msg.sender) >= 1, "Error, you don't have approval");
         require(IDetectives(detectivesTokenAddr).balanceOf(msg.sender) >= 1, "Error, you're not a detective");
         
         if(tokenIdToRuler[_tokenId].isSPRevealed == true) {
@@ -166,28 +157,12 @@ contract Rulers is ERC721Enumerable, AccessControl {
         
     }
 
-    function increaseSp(uint256 _tokenId) external onlyRole(SPD_ROLE) {
+    function killRuler(address _approvalTokenAddr, uint256 _tokenId) external payable {
         require(_exists(_tokenId), "Error, token doesn't exist");
-        
-        bool isFound = false;
-        while(isFound == false) {
-            uint256 _index = 0;
-            if(tokenIdToRuler[_tokenId].sP == rulerStatePsychopath[_index]) {
-                _index++;
-                tokenIdToRuler[_tokenId].sP = rulerStatePsychopath[_index];
-
-            } else {
-                _index++;
-            }
-        }
-    }
-
-    function killRuler(uint256 _tokenId) external payable {
-        require(_exists(_tokenId), "Error, token doesn't exist");
-        require(IApproval(approvalTokenAddr).balanceOf(msg.sender) >= 1, "Error, you don't hace approval");
+        require(IERC20(_approvalTokenAddr).balanceOf(msg.sender) >= 1, "Error, you don't have approval");
         require(IDetectives(detectivesTokenAddr).balanceOf(msg.sender) >= 1, "Error, you're not a detective");
 
-        if(tokenIdToRuler[_tokenId].sP == rulerStatePsychopath[4] || IApproval(approvalTokenAddr).balanceOf(msg.sender) >= 4) {
+        if(tokenIdToRuler[_tokenId].isSPRevealed == true  || IERC20(_approvalTokenAddr).balanceOf(msg.sender) >= 4) {
             _burn(_tokenId);
         }
         
@@ -204,6 +179,12 @@ contract Rulers is ERC721Enumerable, AccessControl {
         require(address(this).balance > 0, "Error, the contract is empty");
 
         payable(msg.sender).transfer(address(this).balance);
+    }
+
+    function revealRulerData(uint256 _tokenId) public view returns (Ruler memory) {
+        require(tokenIdToRuler[_tokenId].isSPRevealed == true, "Error, this is private information");
+
+        return tokenIdToRuler[_tokenId];
     }
    
         

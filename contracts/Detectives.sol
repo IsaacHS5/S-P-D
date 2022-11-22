@@ -49,11 +49,13 @@ contract Detectives is ERC721Enumerable, AccessControl {
         string memory _contractSymbol,
         uint256 _setMaxSupply,
         uint256 _setMintPrice,
-        address _spdAddr
+        address _spdAddr,
+        address _rulersTokenAddr
     )
     ERC721(_contractName, _contractSymbol) {
         maxSupply = _setMaxSupply;
         mintPrice = _setMintPrice;
+        rulersTokenAddr = _rulersTokenAddr;
         _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _setupRole(SPD_ROLE, _spdAddr);
     }
@@ -151,12 +153,6 @@ contract Detectives is ERC721Enumerable, AccessControl {
         }
     }
 
-    function withdraw() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(address(this).balance > 0, "Error, the contract is empty");
-
-        payable(msg.sender).transfer(address(this).balance);
-    }
-
     function killDetective(uint256 _tokenId) external payable {
         require(_exists(_tokenId), "Error, token doesn't exist");
         require(IRulers(rulersTokenAddr).balanceOf(msg.sender) >= 1 , "Error, you are not a ruler");
@@ -166,6 +162,13 @@ contract Detectives is ERC721Enumerable, AccessControl {
         }
         
     }
+
+    function withdraw() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(address(this).balance > 0, "Error, the contract is empty");
+
+        payable(msg.sender).transfer(address(this).balance);
+    }
+
 
 
 }
